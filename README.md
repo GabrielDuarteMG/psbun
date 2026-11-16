@@ -16,7 +16,7 @@
   <a href="LICENSE"><img alt="license" src="https://img.shields.io/badge/license-GPL--3-green" /></a>
   <img alt="firmware" src="https://img.shields.io/badge/PS5_firmware-13.60_tested-brightgreen" />
   <a href="https://ps5term.phantomptr.com/"><img alt="website" src="https://img.shields.io/badge/website-ps5term.phantomptr.com-59e5ce" /></a>
-  <a href="https://discord.gg/fzK3xddtrM"><img alt="discord" src="https://img.shields.io/badge/discord-join-5865F2" /></a>
+  <a href="https://discord.gg/fzK3xddtrM"><img alt="UndefinedLab on Discord" src="https://img.shields.io/badge/discord-UndefinedLab-5865F2" /></a>
 </p>
 
 ---
@@ -277,7 +277,7 @@ PS5Term's website: [ps5term.phantomptr.com](https://ps5term.phantomptr.com/).
 
 If you find this tool useful, consider buying me a coffee!
 
-* Discord server: [https://discord.gg/fzK3xddtrM](https://discord.gg/fzK3xddtrM)
+* Discord server, UndefinedLab: [https://discord.gg/fzK3xddtrM](https://discord.gg/fzK3xddtrM)
 * Support me on Ko-fi: [https://ko-fi.com/B0B81S0WUA](https://ko-fi.com/B0B81S0WUA)
 
 [![Support me on Ko-fi](https://storage.ko-fi.com/cdn/kofi3.png?v=3)](https://ko-fi.com/B0B81S0WUA)

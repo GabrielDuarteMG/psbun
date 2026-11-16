@@ -12,7 +12,7 @@ Only the **latest release** receives fixes. Please reproduce an issue on the new
 Report privately with GitHub's
 **[Report a vulnerability](https://github.com/phantomptr/ps5term/security/advisories/new)**
 button (Security tab → Report a vulnerability). Only you and the maintainer can see it.
-If you can't use that, ask for a private channel on [Discord](https://discord.gg/fzK3xddtrM);
+If you can't use that, ask for a private channel on the [UndefinedLab Discord](https://discord.gg/fzK3xddtrM);
 don't post details publicly.
 
 Please include what the issue is and its impact, steps to reproduce, and the PS5Term
