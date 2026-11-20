@@ -1,304 +1,129 @@
 # psbun
 
 <p align="center">
-  <img src="assets/branding/icon.png" alt="PS5Term" width="160" />
+  <img src="docs/images/ps5-bun.jpg" alt="psbun, Bun station 5 port" width="360" />
 </p>
 
 <p align="center">
-  <strong>psbun</strong> (Bun station 5 port) is this fork of
-  <a href="https://github.com/phantomptr/ps5term">PS5Term</a>. It runs
-  <a href="https://bun.sh">Bun</a> as a native payload on a jailbroken PS5.
-  What has run on a console, and what has not, is in
-  <a href="docs/BUN_PORT.md">docs/BUN_PORT.md</a>.
-  The terminal itself is still PS5Term: a native shell for the PS5's own files, a real
-  Linux shell with <code>curl</code>, <code>nano</code>, <code>tmux</code> and
-  <code>htop</code>, and SSH and SFTP from your computer. Drive it with a keyboard, a
-  mouse or a controller alone.
+  <strong>psbun</strong> (Bun station 5 port) is a native
+  <a href="https://bun.sh">Bun</a> 1.4.4 payload for a jailbroken PlayStation 5.<br />
+  By <a href="https://github.com/GabrielDuarteMG"><strong>Gabriel Duarte</strong> (@GabrielDuarteMG)</a>.
 </p>
 
-<p align="center">
-  <a href="https://github.com/phantomptr/ps5term/releases"><img alt="release" src="https://img.shields.io/github/v/release/phantomptr/ps5term?display_name=tag&sort=semver&color=blue" /></a>
-  <a href="LICENSE"><img alt="license" src="https://img.shields.io/badge/license-GPL--3-green" /></a>
-  <img alt="firmware" src="https://img.shields.io/badge/PS5_firmware-13.60_tested-brightgreen" />
-  <a href="https://ps5term.phantomptr.com/"><img alt="website" src="https://img.shields.io/badge/website-ps5term.phantomptr.com-59e5ce" /></a>
-  <a href="https://discord.gg/fzK3xddtrM"><img alt="UndefinedLab on Discord" src="https://img.shields.io/badge/discord-UndefinedLab-5865F2" /></a>
-</p>
+Bun runs here on the console's own FreeBSD (the FreeBSD 11 ABI of ps5-payload-sdk v0.45), not inside a Linux guest. The Rust target is `x86_64-ps5-freebsd`. C and C++ are `x86_64-sie-ps5` / `__PROSPERO__`. The full narrative is [docs/BUN_PORT.md](docs/BUN_PORT.md). The dated console log is [tooling/bun-port/README.md](tooling/bun-port/README.md).
 
----
+This repository is a fork of [PS5Term](https://github.com/phantomptr/ps5term) by **PhantomPtr**. The terminal app in the tree is still PS5Term. psbun is the Bun port on top of it. Thank you, PhantomPtr, for PS5Term and for making this fork possible. The people PhantomPtr thanks are thanked again below. None of this stands without their work.
 
-## What it does
+## What has run on a console
 
-- **A native terminal** on the console's screen. Colours, Unicode and box drawing are
-  drawn at native 1080p, with tabs, split panes, search, selection and copy/paste.
-- **A built-in native shell** for the PS5's own files: `ls -alh`, `cat`, `cp`, `mv`,
-  `grep`, `sha256sum`, `xxd`, pipes, redirects, `;`, `&&` and `||`. Type `help`.
-  System commands: `ps`, `kill`, `uptime`, `free`, `nproc`, `sysinfo` and a read-only
-  `sysctl`.
-- **A real Linux shell**, inside the app: a RISC-V Linux 6.12 guest with BusyBox,
-  `curl` with HTTPS, `nano`, `tmux`, `htop`, `jq` and `less`. Choose Start Linux
-  in Settings, or just connect over SSH. Files in `/mnt/data` persist (16 MiB at first;
-  grow it to 1, 2 or 4 GiB), and `/mnt/ps5` shows the PS5's `/data` (or everything the
-  app can see, if you choose that in Settings).
-- **PS5 programs in a tab**: `run /data/homebrew/bin/tool` starts a PS5 ELF program (ncurses
-  menus included) in the built-in shell's tab, through your ELF loader on port 9021. See
-  [docs/PS5_PROGRAMS.md](docs/PS5_PROGRAMS.md).
-- **Linux environments**: Settings → Linux environments installs and opens Alpine 3.23
-  (`apk`) or Ubuntu 24.04 LTS (`apt`), each in its own tab, with its packages kept on the
-  Linux disk. Make one the default for new Linux tabs, or remove it.
-- **SSH and SFTP** on port 2222, with the password shown in Settings or your own key:
+Every result is from the development launcher, against `/data/ps5term-dev/bun.elf`. The `bun` command inside a PS5Term tab has not been the thing under test.
 
-  ```sh
-  ssh -p 2222 linux@<PS5-IP>                # A real Linux shell; starts Linux if needed.
-  command ssh -T -p 2222 ps5term@<PS5-IP>   # The built-in native shell.
-  sftp -P 2222 ps5term@<PS5-IP>             # The PS5's own files.
-  ```
+The first `--version` never printed. The kernel log, hidden at first by the launcher's `[launch]` filter, was a `SIGSEGV` in `_mi_auto_process_init`. The PS5 loader does not set up ELF TLS, so mimalloc's `__thread` default heap was still the empty sentinel and the faulting read was at offset `0x28`. Building mimalloc with `MI_TLS_MODEL_PTHREADS=1` got past that. A second thread then crashed because `%fs:0` is not a unique per-thread pointer here. `MI_PRIM_THREAD_ID()` is `pthread_self()` under `__PROSPERO__`.
 
-- **In your language.** All 21 languages of the website: English, Chinese (Simplified and
-  Traditional), Hindi, Spanish, Arabic, Bengali, Polish, Portuguese, Russian, Japanese, German,
-  French, Korean, Turkish, Vietnamese, Indonesian, Italian, Thai, Hungarian and Persian. It
-  follows the PS5's language; choose another in Settings → Language. Linux and its programs
-  stay as a normal Linux would be.
-- **Any input, alone.** A keyboard alone, a mouse alone, keyboard and mouse, or a
-  controller alone: every action works with each, and on-screen hints name the keys
-  of whatever you used last. See the [feature access matrix](docs/FEATURES.md).
+After those fixes, this set passes:
 
-## What it doesn't do
+| Command | Result |
+| --- | --- |
+| `--version` | `1.4.4` |
+| `-e 'console.log(process.platform, process.arch, 1+1)'` | `freebsd x64 2` |
+| `` Bun.$`echo hi` `` | `hi` |
+| `Bun.spawn` of `bun.elf -e 'console.log(7)'` | `7`, exit 0 |
+| `fetch("https://google.com/")` and `fetch("https://example.com/")` | 200 |
+| `tls.connect` to google.com | TLSv1.3 |
+| `bun install`, `bun install --force`, `bun add semver` | packages install; `require` loads them |
+| `fs.copyFileSync`, `fs.utimesSync`, `fs.accessSync`, `existsSync` | correct results |
 
-- The built-in shell is not a full POSIX shell: no other programs, job control or
-  scripts. Use the `linux` login or Start Linux for that.
-- Linux runs interpreted, so it suits shell work rather than heavy computation. Its
-  outbound IPv4 network goes through the app, and nothing can connect in to it.
-  Changes outside `/mnt/data` reset when Linux stops.
-- In the terminal itself, CJK characters show a replacement mark (the app's own screens are
-  translated into every language above).
-- Firmware 13.60 on a phat console (CFI-1115A) is the only hardware tested so far.
-  Reports from other firmware are welcome.
-
-## A quick look
-
-Host-rendered previews of the actual app scene (not console screenshots):
-
-<p align="center">
-  <img src="docs/images/terminal.png" alt="The terminal" width="720" />
-  <img src="docs/images/settings.png" alt="Settings" width="720" />
-  <img src="docs/images/about.png" alt="About" width="720" />
-</p>
+The syscall audit reports zero failures. `elfldr`, `shsrv` and `klogsrv` were still running afterwards.
 
 ## Install
 
-Website: **[ps5term.phantomptr.com](https://ps5term.phantomptr.com/)**.
+How to install psbun on a console is coming soon.
 
-**From ProsperoStore (easiest):** open [ProsperoStore](https://prosperostore.net/) on the PS5,
-find **PS5Term** under Utilities and install it. New versions show up there as updates.
+## Why `bun install` needed a layer of its own
 
-**By hand:** download `PS5Term-<version>.zip` from the
-[Releases page](https://github.com/phantomptr/ps5term/releases), copy the complete
-`FAKE99260` folder to `/data/homebrew/FAKE99260` on the console (for example with
-[PS5Upload](https://ps5upload.phantomptr.com/)), and launch it with your homebrew launcher.
+Nothing already published solves this. Bun asks the kernel for a function the PS5 kernel does not have, and reading kernel memory to recover it is out of the question. Each failure was measured on the console (`probe_fdpath`, `probe_faccessat`) before the workaround.
 
-Either way a compatible jailbreak and native app loader are required. The app owns its
-SSH/SFTP server and needs no separately sent payload or ELF loader. Updating keeps your
-settings, SSH password and Linux files (they live in `/data/ps5term`).
+- **Path of an open file.** Bun uses `fcntl(F_KINFO)`, which exists from FreeBSD 13. On FreeBSD 11 the documented way is `sysctl kern.proc.filedesc`. On the console the first returns `EINVAL` and the second `ENOENT`: Sony removed that sysctl node. [ps5compat/fdpath.c](tooling/bun-port/ps5compat/fdpath.c) remembers the path passed to `open`, `openat`, `dup`, `dup2` and `fcntl(F_DUPFD*)`, and returns it only while `stat` and `fstat` still agree on device and inode. Without that, `bun install` stopped at `failed to resolve cache dir … EINVAL`.
+- **`/data` has no hard links and no symbolic links.** Both return `EOPNOTSUPP`. An `EOPNOTSUPP` from `linkat` is treated like `EXDEV`, so Bun copies the package, the path it already has for other file systems that cannot link.
+- **`fs.copyFileSync` returned `ENOSYS`.** The kernel has no `copy_file_range`, and Bun's FreeBSD read/write fallback only runs for `EXDEV`, `EINVAL`, `EOPNOTSUPP` and `EBADF`. ps5compat's `copy_file_range` is a read/write loop with the system call's offset and return rules.
+- **`faccessat` and `readlinkat` always return `ENOSYS`.** `utimensat` returns `EACCES` and `futimens` returns `ESRCH` ("process not found"), which is a sign the call may be landing on a different Sony function. The layer never issues those calls. It uses `fstatat`, `access`, `readlink`, `utimes`, `lutimes` and `futimes`. Payloads run with real uid 1 and effective uid 0. This is what let `bun install --force` get past `the downloaded package was not found in the cache`. `/data` (nullfs) ignores access times even for the kernel's own `utimes`.
+- **Package executables need a symlink.** `node_modules/.bin` entries are symbolic links, and `/data` cannot store them. An `EOPNOTSUPP` from `symlink` takes the exit Bun already has for Android shared storage: one warning, the bin links are skipped, the packages themselves are installed. `bun add semver` passed that way.
 
-**Uninstalling:** the PS5 keeps `/data/ps5term` when the app is removed, and the Linux disk
-there can be several GiB. Before uninstalling, open Settings → Linux environments and storage,
-stop Linux and choose **Delete Linux disk...** (and **Delete backup** if shown). Already
-uninstalled? Install PS5Term again, delete the disk the same way, then uninstall. What is left
-afterwards is a few small files (settings and SSH keys).
+Before install could pass, a few more holes had to close. `F_DUPFD_CLOEXEC` returns `EOPNOTSUPP` on every descriptor, so it is built from `F_DUPFD` plus `F_SETFD` (`Bun.$` needed this). The console's `getaddrinfo` refuses a numeric service without a socket type. c-ares finds no `/etc/resolv.conf` and asks `127.0.0.1`, so DNS uses the console's own resolver. Thirty-three SDK libc stubs are `syscall; ret` with no carry check, so a kernel error came back as a success and HTTPS hung reading stderr. `readdir` under `/data` needs a 128 KiB buffer, because that file system refuses a `getdents` buffer smaller than its 64 KiB `st_blksize`.
 
-## Quick start
+The checked-in patches and `tools/build-bun-port.sh` do not yet reproduce the binary that ran. Bun source changes live in `.deps/bun-port/bun`, and the build environment in `build/bun-port/bunenv.sh`. Those directories are not in the repository.
 
-1. Open PS5Term. The built-in shell is ready; type `help`.
-2. Open Settings (Options on the controller, Ctrl+Shift+S on a keyboard, or the
-   Settings button) and choose **Enable / disable SSH**. SSH is off by default and the
-   choice is saved on the console. Settings shows the connection command and the
-   password, and can change it.
-3. Choose **Start Linux** in Settings for a real Linux shell, or connect with
-   `ssh -p 2222 linux@<PS5-IP>`.
+## What it still does not do
 
-Ghostty works with its default SSH features. In Warp, use `command ssh` for the
-`ps5term` login (see [terminal client compatibility](docs/TERMINAL_CLIENTS.md)). See
-[SSH setup and validation](docs/OWNED_SSH.md) and
-[controls and limitations of Linux](docs/SUBSYSTEM.md).
+- Commands in `node_modules/.bin` are not created. The package loads through `require`. `bun run semver`, and `bunx` for those commands, do not work.
+- `bun install -g` still fails when it tries to create links in the global bin directory.
+- Small files that invoke the package, in place of those symlinks, would be new Bun behaviour. That is not part of this cut.
+- A PS5Term tab has not run `bun install`. The shell already has the shape of that integration (`bun` copies `/app0/assets/bun` to `/data/ps5term/bun`, because a payload cannot see `/app0`), and that copy has not been the console gate. The launcher would set `PS5TERM_TTY=1`, `BUN_INSTALL`, `PATH` and `BUN_JSC_useJIT=0`. `HOME` stays `/data`.
 
-## Controls
+## Other difficulties
 
-Keyboard: Shift+F10 (or the Menu key) opens the actions menu. Ctrl+Shift+S opens
-Settings, Ctrl+Shift+K the on-screen keyboard, Ctrl+Shift+Space selects text and
-Ctrl+Shift+1-4 shows a tab; these work everywhere. In a Linux program every F-key,
-F1-F12, goes to the program; in the built-in shell F4 is the keyboard, F5 reconnects
-and F6 opens Settings. Settings follows the screen with Tab/Shift+Tab or Up/Down, and
-F1 there opens About.
+The shape of a payload this large comes from [ProsperoWeb](https://github.com/kvaps/ProsperoWeb): the open SDK, an ELF loader on port 9021, 16 KiB pages, a static link. Thank you to kvaps and everyone on ProsperoWeb. The WebKit that is compiled is Bun's fork, not ProsperoWeb's tree. ProsperoWeb turns the JavaScript JIT on. psbun compiles the JIT tiers (Bun's WebKit does not build with `ENABLE_JIT=OFF`) and then forces the LLInt interpreter. No executable memory is allocated for JIT code.
 
-Controller:
+- Versioned libc symbols (`name@FBSD_1.0`) do not match the SDK's unversioned stubs. `d_fileno` is `u32` on FreeBSD 11. `AT_USRSTACKLIM` is absent. The SDK's `clock_nanosleep` is a FreeBSD 13 stub and returns `ENOSYS`. A normal exit comes back with `WCOREFLAG` (`0x80`) set, which Rust treats as failure.
+- Emulated TLS has to outlive the first pthread destructor rounds, or C++ and Rust `thread_local` destructors never run. Sony's clang driver forces unified full LTO, which cannot take Rust's ThinLTO inputs, so the link uses the FreeBSD ELF driver.
+- A payload cannot `fork` or `vfork`. New processes exist only through `posix_spawn`. There is no pseudo-terminal: `openpty` returns `ENOSYS`.
+- A raw system call number can land on an unrelated Sony call. [audit_syscalls.py](tooling/bun-port/audit_syscalls.py) is the check.
 
-- Triangle opens or closes the keyboard; D-pad selects a key; Cross types it. Its
-  last two rows have Esc, Tab, Ctrl, Alt, arrows, PgUp, PgDn, Home, End, F1-F10, Del
-  and Ins. Ctrl and Alt apply to the next key; R3 Shift also shifts terminal keys
-  (Shift+Tab).
-- R2 sends Enter. With the keyboard closed, Cross runs entered text or opens
-  the keyboard for an empty line. Cross retries when shell startup has failed.
-- Square deletes; R3 switches case; L1/R1 are Up and Down, which browse history.
-- Circle closes the keyboard. Otherwise it cancels entered text in the built-in shell
-  and sends Esc in Linux. L2 + Circle interrupts. D-pad scrolls output while the
-  keyboard is closed; in a full-screen program it sends the arrows.
-- Options opens Settings. Cross toggles SSH, Triangle shows/hides the password,
-  Square changes the password, Circle goes back.
+The rest, including the crash handler and the load base used to symbolize it, is in [docs/BUN_PORT.md](docs/BUN_PORT.md).
 
-Mouse: click any button or key, drag to select, right-click for the actions menu,
-middle-click to paste, and the wheel scrolls.
+## Later: oh-my-pi
 
-## Build and test
+One plan is to run the oh-my-pi coding agent on this same Bun, natively, in a PS5Term tab. `omp` here is `@oh-my-pi/pi-coding-agent` 19.0.1, not OpenMP. It is a harness. Its addon, global install tree and `omp` command are not in the current console cut. Settings would live in `/data/.omp`. Features that need a pseudo-terminal stay unavailable, and `bun install -g` still cannot publish the CLI.
 
-```sh
-make release
-```
+## Thanks
 
-Build on Linux. Output: `dist/FAKE99260/` and `dist/PS5Term-<version>.zip`. The
-release build, its definitions and the checks to run first are in
-[releasing](docs/RELEASE.md); see also [testing](docs/TESTING.md) and
-[getting started](docs/GETTING_STARTED.md).
+Thank you, **PhantomPtr**, for [PS5Term](https://github.com/phantomptr/ps5term). This fork exists because you built the terminal, the launcher path and the place a payload can sit on the console's screen. The original repository, its license and its credits stay the foundation of everything below.
 
-The renderer uses bundled antialiased JetBrains Mono at native 1920x1080, with 16 px
-body text, 172 columns and 29 rows. It includes accented Latin, Greek, Cyrillic,
-arrows and Powerline symbols; box and block characters are drawn to fill their cells.
-Regenerate the atlas with Pillow 12.0.0 and `tools/generate-font-atlas.py`. No console
-font dependency is required. The optional Bash 5.3.20 SDK link audit and Linux shell
-smoke suite are documented in [BASH_PORT.md](docs/BASH_PORT.md); Bash is not an
-installed native session backend. Development boundaries and retired legacy components
-are in [development scope](docs/DEVELOPMENT_SCOPE.md).
+PS5Term, and so psbun, builds on other people's work. Thank you to each of them. **Included** means their source is in this repository or built into the app. **Derived** means their code was adapted. **Library** means a dependency the build pulls in. **Fetched on request** means it is downloaded from its own home when you use the feature, and is not shipped here. **Reference** means it was read to learn how something works, and no code was taken. Full notices are in [NOTICE.md](NOTICE.md).
 
-## Disclaimer
+**Included.** Thank you.
 
-> **PS5Term is provided for research, educational, interoperability, and homebrew
-> development purposes only.** It is not affiliated with, endorsed by, or connected to
-> Sony Interactive Entertainment Inc. "PlayStation" and "PS5" are trademarks of Sony
-> Interactive Entertainment Inc., used here for identification only.
->
-> **Use this software entirely at your own risk.** It is provided "as is", without
-> warranty of any kind, express or implied, including but not limited to warranties of
-> merchantability, fitness for a particular purpose, and non-infringement.
-
-**➡ Full terms: [DISCLAIMER.md](DISCLAIMER.md).** By downloading, building, installing,
-or using this software you accept them in full. If you do not agree, do not use it.
-
-- **It runs commands on a modified PS5** with the app's permissions. A mistaken command
-  can delete or corrupt data the app can reach. Back up anything you cannot afford to
-  lose before you begin.
-- **SSH opens port 2222 on your network.** Anyone who can reach it with the password or
-  an authorised key can run commands and transfer files. Keep it on a network you
-  trust, and switch it off when you don't need it.
-- **No piracy.** It must not be used to copy, distribute, or run software you do not
-  lawfully own or are licensed to use.
-- **No support is guaranteed.** This is a free, volunteer-built tool.
-
-## Credits
-
-PS5Term builds on other people's work. Each entry says how: **included** (their source
-is in this repository or built into the app), **derived** (their code adapted into
-PS5Term), **library** (a dependency the build pulls in), **fetched on request**
-(downloaded from its own home when you use the feature; not shipped with PS5Term), or
-**reference** (read to learn how something works; no code taken). Full notices are in
-[NOTICE.md](NOTICE.md).
-
-**Included:**
-* [libvterm](https://www.leonerd.org.uk/code/libvterm/) (Paul Evans): the terminal
-  emulation, in [`third_party/libvterm`](third_party/libvterm)
-* [wolfSSH](https://github.com/wolfSSL/wolfssh) and [wolfSSL](https://github.com/wolfSSL/wolfssl)
-  (wolfSSL Inc.): the SSH and SFTP server and its cryptography, built from verified
-  source archives with PS5Term's patches
-* [TinyEMU](https://bellard.org/tinyemu/) (Fabrice Bellard): the RISC-V machine that
-  runs Linux, in [`third_party/tinyemu`](third_party/tinyemu)
-* [libslirp](https://gitlab.freedesktop.org/slirp/libslirp) (the QEMU project and
-  contributors): the Linux guest's network, in [`third_party/libslirp`](third_party/libslirp)
-* The Linux guest, built with [Buildroot](https://buildroot.org/):
-  [Linux](https://kernel.org/), [OpenSBI](https://github.com/riscv-software-src/opensbi),
-  [musl](https://musl.libc.org/), [BusyBox](https://busybox.net/),
-  [ncurses](https://invisible-island.net/ncurses/), curl, Mbed TLS, nano, tmux, htop,
-  jq, less, tree and e2fsprogs
-* [JetBrains Mono](https://www.jetbrains.com/lp/mono/) (JetBrains): the terminal font,
-  in [`third_party/jetbrains-mono`](third_party/jetbrains-mono)
-* [Noto Sans](https://github.com/notofonts) SC, TC, JP, KR, Arabic, Devanagari, Bengali and
-  Thai (Adobe, Google and the Noto Project Authors, SIL Open Font License): the app's
-  translated text in those scripts, rendered ahead of time into `assets/i18n` by
-  `tools/generate-i18n.py`; licenses in [`third_party/noto`](third_party/noto)
-* [font8x8](https://github.com/dhepper/font8x8) (Daniel Hepper): the public-domain
-  bitmap font, in [`third_party/font8x8`](third_party/font8x8)
+* [libvterm](https://www.leonerd.org.uk/code/libvterm/) (Paul Evans): the terminal emulation, in [`third_party/libvterm`](third_party/libvterm)
+* [wolfSSH](https://github.com/wolfSSL/wolfssh) and [wolfSSL](https://github.com/wolfSSL/wolfssl) (wolfSSL Inc.): the SSH and SFTP server and its cryptography
+* [TinyEMU](https://bellard.org/tinyemu/) (Fabrice Bellard): the RISC-V machine that runs Linux, in [`third_party/tinyemu`](third_party/tinyemu)
+* [libslirp](https://gitlab.freedesktop.org/slirp/libslirp) (the QEMU project and contributors): the Linux guest's network, in [`third_party/libslirp`](third_party/libslirp)
+* The Linux guest, built with [Buildroot](https://buildroot.org/): [Linux](https://kernel.org/), [OpenSBI](https://github.com/riscv-software-src/opensbi), [musl](https://musl.libc.org/), [BusyBox](https://busybox.net/), [ncurses](https://invisible-island.net/ncurses/), curl, Mbed TLS, nano, tmux, htop, jq, less, tree and e2fsprogs, and the people who maintain each of them
+* [JetBrains Mono](https://www.jetbrains.com/lp/mono/) (JetBrains): the terminal font, in [`third_party/jetbrains-mono`](third_party/jetbrains-mono)
+* [Noto Sans](https://github.com/notofonts) SC, TC, JP, KR, Arabic, Devanagari, Bengali and Thai (Adobe, Google and the Noto Project Authors): the app's translated text
+* [font8x8](https://github.com/dhepper/font8x8) (Daniel Hepper): the public-domain bitmap font, in [`third_party/font8x8`](third_party/font8x8)
 * The icon, selection artwork and the music track "Night Drive" by BlackBearReloaded
 
-**Derived:**
-* ps5-native-app-boilerplate (BlackBearReloaded):
-  the native app foundation
-* [shsrv](https://github.com/ps5-payload-dev/shsrv) (John Törnblom): the local command
-  backend, in [`third_party/shsrv`](third_party/shsrv)
-* [ps5sshd](https://github.com/intestinate/ps5sshd) (intestinate): the legacy SSH
-  service, in [`third_party/ps5sshd`](third_party/ps5sshd)
+**Derived.** Thank you.
 
-**Libraries:**
-* [PS5 Payload SDK](https://github.com/ps5-payload-dev/sdk) (John Törnblom), with its
-  LLVM libc++ headers, and [zlib](https://zlib.net/)
+* ps5-native-app-boilerplate (BlackBearReloaded): the native app foundation
+* [shsrv](https://github.com/ps5-payload-dev/shsrv) (John Törnblom): the local command backend, in [`third_party/shsrv`](third_party/shsrv). psbun starts processes through this same `elfldr`
+* [ps5sshd](https://github.com/intestinate/ps5sshd) (intestinate): the legacy SSH service, in [`third_party/ps5sshd`](third_party/ps5sshd)
+
+**Libraries.** Thank you.
+
+* [PS5 Payload SDK](https://github.com/ps5-payload-dev/sdk) (John Törnblom), with its LLVM libc++ headers, and [zlib](https://zlib.net/). The whole port is built on this SDK
 * [GoogleTest](https://github.com/google/googletest) for host tests only
+* [Bun](https://github.com/oven-sh/bun) (Oven and the Bun contributors): the runtime this port is trying to run
+* [ProsperoWeb](https://github.com/kvaps/ProsperoWeb) (kvaps and contributors): the example of a large WebKit payload on this SDK
 
-**Fetched on request:**
-* [Alpine Linux](https://www.alpinelinux.org/) minirootfs and the `apk` packages you
-  install
-* [Ubuntu Base](https://cdimage.ubuntu.com/ubuntu-base/) 24.04 and the `apt` packages you
-  install
-* Optional packaging tools: [UFS2Tool](https://github.com/SvenGDK/UFS2Tool) (SvenGDK),
-  [MkPFS](https://github.com/PSBrew/MkPFS) (PSBrew) and
-  [PacBrew](https://github.com/ps5-payload-dev/pacbrew-repo) ports
+**Fetched on request.** Thank you.
+
+* [Alpine Linux](https://www.alpinelinux.org/) minirootfs and the `apk` packages you install
+* [Ubuntu Base](https://cdimage.ubuntu.com/ubuntu-base/) 24.04 and the `apt` packages you install
+* Optional packaging tools: [UFS2Tool](https://github.com/SvenGDK/UFS2Tool) (SvenGDK), [MkPFS](https://github.com/PSBrew/MkPFS) (PSBrew) and [PacBrew](https://github.com/ps5-payload-dev/pacbrew-repo) ports
 * [GNU Bash](https://www.gnu.org/software/bash/) for the optional, uninstalled Bash port
 
-**References:**
-* [kstuff-lite](https://github.com/EchoStretch/kstuff-lite) (EchoStretch and the kstuff
-  contributors): the native-executable capability record for one research profile
-* [kodi-ps5](https://github.com/Phoenixx1202/kodi-ps5) (Phoenixx1202 and contributors):
-  the native directory buffer requirement
-* SharpProspero: the PS5 ELF format, while writing PS5Term's own converter
-* [OpenOrbis](https://github.com/OpenOrbis/OpenOrbis-PS4-Toolchain): the public
-  libkernel mapping declarations
+**References.** Thank you.
 
-PS5Term is one tool among many. The PS5 scene is full of great work: loaders, kernel
-patches, payloads, file managers and more. If something here saves you time, the people
-behind those tools deserve the same thanks. Please support them too.
+* [kstuff-lite](https://github.com/EchoStretch/kstuff-lite) (EchoStretch and the kstuff contributors): the native-executable capability record for one research profile
+* [kodi-ps5](https://github.com/Phoenixx1202/kodi-ps5) (Phoenixx1202 and contributors): the native directory buffer requirement
+* SharpProspero: the PS5 ELF format, while writing PS5Term's own converter
+* [OpenOrbis](https://github.com/OpenOrbis/OpenOrbis-PS4-Toolchain): the public libkernel mapping declarations
+
+Thank you to the rest of the PS5 scene as well: the people behind the loaders, kernel patches, payloads and file managers. PS5Term is one tool among many, and psbun is one more attempt on top of it. If something here is useful, the thanks belong to them first.
 
 ## License
 
-PS5Term is free software under the GNU General Public License v3.0 or later; see
-[LICENSE](LICENSE). Included third-party code keeps its own license, next to the code or
-in the app's `licenses` folders; see [Credits](#credits) and [NOTICE.md](NOTICE.md).
-Corresponding source for the Linux guest is described in [SUBSYSTEM.md](docs/SUBSYSTEM.md).
+psbun follows PS5Term: free software under the GNU General Public License v3.0 or later. See [LICENSE](LICENSE). Included third-party code keeps its own license, next to the code or in the app's `licenses` folders. See [NOTICE.md](NOTICE.md).
 
-## Author
-
-Created and maintained by **PhantomPtr** ([phantomptr.com](https://phantomptr.com/)).
-PS5Term's website: [ps5term.phantomptr.com](https://ps5term.phantomptr.com/).
-
-* [Follow me on X (@phantomptr)](https://x.com/phantomptr)
-* Also by PhantomPtr: [PS5Upload](https://github.com/phantomptr/ps5upload), which sends
-  games, apps and homebrew to a jailbroken PS5 (and can install PS5Term).
-
-## Support
-
-If you find this tool useful, consider buying me a coffee!
-
-* Discord server, UndefinedLab: [https://discord.gg/fzK3xddtrM](https://discord.gg/fzK3xddtrM)
-* Support me on Ko-fi: [https://ko-fi.com/B0B81S0WUA](https://ko-fi.com/B0B81S0WUA)
-
-[![Support me on Ko-fi](https://storage.ko-fi.com/cdn/kofi3.png?v=3)](https://ko-fi.com/B0B81S0WUA)
-
-**Crypto**, straight to my hardware wallet. Send each coin only on its own network;
-anything else can't be recovered.
-
-| Coin | Network | Address |
-| --- | --- | --- |
-| BTC | Bitcoin | `bc1q36gxkvd3wfxy9azm8hft3rru9m6m9hjvn7u20n` |
-| ETH | Ethereum | `0x2e787654db543B69FB011E16995C274dFAfc2286` |
-| SOL | Solana | `G1q5XCCn3mePYpcx7uY17CwDsUaAZTcty56huUDvVqjG` |
-| XRP | XRP Ledger | `rEVq3si3sm9NuWNuZiUZFKsUtwC3w9SrjR` (no destination tag needed) |
-
-QR codes for each are on [the PS5Upload website](https://ps5upload.phantomptr.com/#thanks).
-
-### Thank you
-
-Thank you to everyone who supports PS5Term and PS5Upload. Every coffee keeps them going.
+> psbun and PS5Term are not affiliated with, endorsed by, or connected to Sony Interactive Entertainment Inc. "PlayStation" and "PS5" are trademarks of Sony Interactive Entertainment Inc., used here for identification only. Use is at your own risk. Full terms: [DISCLAIMER.md](DISCLAIMER.md).
