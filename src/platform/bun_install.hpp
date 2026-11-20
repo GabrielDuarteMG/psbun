@@ -1,6 +1,6 @@
 // PS5Term - copy the bundled Bun into /data, where payloads can read it. GPL-3.0-or-later.
-// The app ships Bun (bun.elf and the omp install tree) in /app0/assets/bun, which a payload
-// started through the ELF loader cannot see; `bun` and `omp` copy it to /data/ps5term/bun.
+// The app ships bun.elf in /app0/assets/bun, which a payload started through the ELF loader
+// cannot see; `bun` copies it to /data/ps5term/bun.
 #pragma once
 
 namespace term::platform

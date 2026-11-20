@@ -38,7 +38,7 @@ class BuiltinShell
     {
         programs_enabled_ = enabled;
     }
-    // `bun` and `omp` copy Bun from app_root to target before running it from there.
+    // `bun` copies Bun from app_root to target before running it from there.
     // Tests use their own folders; both strings must outlive the shell.
     void configure_bun(const char *app_root, const char *target) noexcept
     {
@@ -170,7 +170,7 @@ class BuiltinShell
     void next_item() noexcept;
     bool open_output(const char *name, bool append_mode, int &fd) noexcept;
     bool prepare_pipeline() noexcept;
-    // `run`, `bun` and `omp`: the tab runs the program (see program_requested()).
+    // `run` and `bun`: the tab runs the program (see program_requested()).
     bool program_tab_free(const char *name) noexcept;
     void request_program(const char *name, std::initializer_list<const char *> lead, int argc,
                          char **argv, int first) noexcept;

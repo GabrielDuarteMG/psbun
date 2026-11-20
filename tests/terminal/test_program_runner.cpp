@@ -129,18 +129,16 @@ int main()
         assert(tab.wait_for("back"));
         loader.thread.join();
     }
-    // `bun` and `omp`: Bun is copied out of the app first, then runs as `run` would, with
-    // the copy's bun.elf (and for omp its cli.js) ahead of the typed arguments.
+    // `bun`: Bun is copied out of the app first, then runs as `run` would, with the copy's
+    // bun.elf ahead of the typed arguments.
     const std::string bun_app = std::string(directory) + "/app-bun",
                       bun_target = std::string(directory) + "/data/ps5term/bun",
-                      bun_elf = bun_target + "/bin/bun.elf",
-                      cli = bun_target +
-                            "/install/global/node_modules/@oh-my-pi/pi-coding-agent/dist/cli.js";
+                      bun_elf = bun_target + "/bin/bun.elf";
     assert(mkdir(bun_app.c_str(), 0755) == 0 && mkdir((bun_app + "/bin").c_str(), 0755) == 0);
     write_file(bun_app + "/version", "bun-test-1\n");
     write_file(bun_app + "/bin/bun.elf", "\177ELF fake bun");
     for (const auto &[command, expected] :
-         {std::pair<std::string, std::string>{"omp --version", bun_elf + "|" + cli + "|--version|"},
+         {std::pair<std::string, std::string>{"bun --version", bun_elf + "|--version|"},
           {"bun -e x", bun_elf + "|-e|x|"}})
     {
         FakeLoader loader;
@@ -176,7 +174,7 @@ int main()
         shell.enable_programs(true);
         const std::string missing = std::string(directory) + "/no-app-bun";
         shell.configure_bun(missing.c_str(), bun_target.c_str());
-        assert(shell.submit("omp"));
+        assert(shell.submit("bun"));
         const auto errors = shell_errors(shell);
         assert(errors ==
                "bun: could not install Bun to " + bun_target + ": No such file or directory\n");
@@ -240,7 +238,7 @@ int main()
         assert(!tab.connection.running_program());
     }
     // A shell without a tab (SSH) refuses.
-    for (const char *command : {"run ", "bun ", "omp "})
+    for (const char *command : {"run ", "bun "})
     {
         term::BuiltinShell shell("/tmp", false);
         assert(shell.submit((command + launcher).c_str()));
@@ -255,6 +253,6 @@ int main()
     rmdir((std::string(directory) + "/run").c_str());
     rmdir(directory);
     std::puts("PASS: run: request, loader, launcher token, line and raw input, Ctrl+C as SIGINT, "
-              "exit status, missing loader and program, SSH refusal; bun and omp: install, "
+              "exit status, missing loader and program, SSH refusal; bun: install, "
               "arguments, install failure");
 }

@@ -1,7 +1,7 @@
 """Bun-port console harness: upload files and run probe payloads on the test PS5.
 
 Development only. Writes on the console are limited to /data/ps5term-dev/ and
-/data/ps5term/bun/ (enforced again by the recv payload). One payload at a time under the
+/data/ps5term/bun/ and the app folder /data/homebrew/FAKE99260/ (enforced again by the recv payload). One payload at a time under the
 shared TestWindow lock; every run has a 60 s host timeout after which only the probe's own
 PID (announced as "PID <n>" in klog) is killed. Before every run the loader, shell and klog
 servers must be alive; if one is missing the harness stops.
@@ -31,7 +31,7 @@ ROOT = Path(__file__).resolve().parents[2]
 RECV_ELF = ROOT / 'build/bun-port/recv.elf'
 LOCK = ROOT / '.local/dev/console.lock'
 DEV_DIR = '/data/ps5term-dev/'
-WRITABLE = (DEV_DIR, '/data/ps5term/bun/')
+WRITABLE = (DEV_DIR, '/data/ps5term/bun/', '/data/homebrew/FAKE99260/')
 REQUIRED_DAEMONS = ('elfldr.elf', 'shsrv.elf', 'klogsrv.elf')
 RUN_TIMEOUT = 60
 

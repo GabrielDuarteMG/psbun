@@ -1360,7 +1360,6 @@ void BuiltinShell::execute_command(int argc, char **argv) noexcept
             "  programs: run PATH [ARGS] runs a PS5 ELF program in this tab (needs an ELF\n"
             "          loader on port 9021; Ctrl+C interrupts; no TTY, so the size is fixed)\n"
             "          bun [ARGS] runs Bun (first use copies it to /data/ps5term/bun)\n"
-            "          omp [ARGS] runs the oh-my-pi coding agent on that Bun\n"
             "Combine: cmd1 | cmd2, cmd1 ; cmd2, cmd1 && cmd2, cmd1 || cmd2\n"
             "Redirect: > file, >> file, < file, 2> file, 2>&1\n"
             "Wildcards: final filename * and ?; quote literal patterns; Linux has full globbing\n"
@@ -1485,21 +1484,16 @@ void BuiltinShell::execute_command(int argc, char **argv) noexcept
         request_program("run", {program.data()}, argc, argv, 2);
         return;
     }
-    if (cmd == "bun" || cmd == "omp")
+    if (cmd == "bun")
     {
-        const char *name = cmd == "bun" ? "bun" : "omp";
-        if (!program_tab_free(name))
+        if (!program_tab_free("bun"))
             return;
         // Payloads cannot see /app0, so Bun runs from its copy in /data.
         int failure = 0;
-        std::array<char, 1024> program{}, script{};
+        std::array<char, 1024> program{};
         const int program_size =
             std::snprintf(program.data(), program.size(), "%s/bin/bun.elf", bun_target_);
-        const int script_size = std::snprintf(
-            script.data(), script.size(),
-            "%s/install/global/node_modules/@oh-my-pi/pi-coding-agent/dist/cli.js", bun_target_);
-        if (program_size < 0 || script_size < 0 ||
-            static_cast<std::size_t>(script_size) >= script.size())
+        if (program_size < 0 || static_cast<std::size_t>(program_size) >= program.size())
             failure = ENAMETOOLONG;
         else
             platform::ensure_bun_installed(bun_app_root_, bun_target_, &failure);
@@ -1511,10 +1505,7 @@ void BuiltinShell::execute_command(int argc, char **argv) noexcept
             diagnostic(message, 1);
             return;
         }
-        if (cmd == "bun")
-            request_program(name, {program.data()}, argc, argv, 1);
-        else
-            request_program(name, {program.data(), script.data()}, argc, argv, 1);
+        request_program("bun", {program.data()}, argc, argv, 1);
         return;
     }
     if (cmd == "sleep")

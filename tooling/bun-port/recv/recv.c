@@ -2,7 +2,7 @@
  *
  * Sent to the console's ELF loader (port 9021) by tools/dev/ps5_bun_console.py. Listens on
  * TCP 9300 for exactly one transfer "<path>\n<size>\n<bytes>", refuses any path outside
- * /data/ps5term-dev/ and /data/ps5term/bun/, writes "<path>.partial", renames it into place
+ * /data/ps5term-dev/, /data/ps5term/bun/ and the app folder /data/homebrew/FAKE99260/, writes "<path>.partial", renames it into place
  * and answers "OK <sha256>\n" (or "ERR <reason>\n"), then exits. A 300 s alarm (room for a
  * ~250 MB bun.elf) bounds its lifetime so it never lingers on the console. */
 #include <arpa/inet.h>
@@ -25,7 +25,8 @@
 #define RECV_PORT 9300
 #define MAX_FILE (512LL * 1024 * 1024)
 
-static const char *const allowed_roots[] = {"/data/ps5term-dev/", "/data/ps5term/bun/"};
+static const char *const allowed_roots[] = {"/data/ps5term-dev/", "/data/ps5term/bun/",
+                                            "/data/homebrew/FAKE99260/"};
 
 static int write_all(int fd, const void *data, size_t size)
 {

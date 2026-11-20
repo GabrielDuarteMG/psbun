@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# PS5Term - build Bun (and the omp addon) as a native PS5 payload: bun.elf. Runs inside the
+# PS5Term - build Bun as a native PS5 payload: bun.elf. Runs inside the
 # ps5term-build container (tooling/bun-port/Dockerfile.build), from /work.
 #
 #   bash tools/build-bun-port.sh [STAGE...]        default: all stages in order
-#   bash tools/build-bun-port.sh --stage DIR       copy bun.elf and the omp tree into DIR
+#   bash tools/build-bun-port.sh --stage DIR       copy bun.elf into DIR
 #
 # Stages: sources icu webkit. Every download is verified against tooling/bun-port/sources.json.
 # SPDX-License-Identifier: GPL-3.0-or-later
@@ -217,25 +217,13 @@ stage_rustprobe() {
     cp "$out/rust-probe-target/x86_64-ps5-freebsd/release/probe_rust" "$out/probe_rust.elf"
 }
 
-# omp's global install as plain files (tooling/bun-port/flatten_tree.py) in $out/global.
-stage_omp() {
-    local version bun_host
-    version=$(source_field omp version)
-    bun_host=$(command -v bun) || die "a host bun is needed to install omp (put it on PATH)"
-    rm -rf "$out/global-root"
-    BUN_INSTALL="$out/global-root" "$bun_host" install -g "@oh-my-pi/pi-coding-agent@$version" \
-        --os freebsd --cpu x64 >/dev/null
-    python3 "$port/flatten_tree.py" "$out/global-root" "$out/global" "$version"
-}
-
 # --stage DIR: the app's assets/bun (copied to /data/ps5term/bun by PS5Term on first use).
 stage_into() {
     local dest=$1 version
-    [[ -f "$out/bun.elf" && -d "$out/global" ]] || die "build bun.elf and the omp tree first"
-    rm -rf "$dest" && mkdir -p "$dest/bin" "$dest/install/global"
+    [[ -f "$out/bun.elf" ]] || die "build bun.elf first"
+    rm -rf "$dest" && mkdir -p "$dest/bin"
     cp "$out/bun.elf" "$dest/bin/bun.elf"
-    cp -r "$out/global/." "$dest/install/global/"
-    version="bun-$(source_field bun version)+omp-$(source_field omp version)+$(sha256sum "$out/bun.elf" | cut -c1-12)"
+    version="bun-$(source_field bun version)+$(sha256sum "$out/bun.elf" | cut -c1-12)"
     echo "$version" >"$dest/version"
     echo "build-bun-port: staged $version in $dest"
 }

@@ -65,7 +65,7 @@ int main()
     std::string elf = "\177ELF";
     for (std::size_t i = 0; elf.size() < 600 * 1024; ++i)
         elf += static_cast<char>('a' + i % 26);
-    write_file(app + "/version", "bun-1.4.4+omp-19.0.1+test\n");
+    write_file(app + "/version", "bun-1.4.4+test\n");
     write_file(app + "/bin/bun.elf", elf, 0700);
     write_file(app + modules + "/a/b.js", "module.exports = 1;\n");
     assert(symlink((app + "/bin/bun.elf").c_str(), (app + "/bin/bun-link").c_str()) == 0);
@@ -75,7 +75,7 @@ int main()
     assert(install(app, target, &error) && error == -1);
     assert(read_file(target + "/bin/bun.elf") == elf);
     assert(read_file(target + modules + "/a/b.js") == "module.exports = 1;\n");
-    assert(read_file(target + "/.installed") == "bun-1.4.4+omp-19.0.1+test\n");
+    assert(read_file(target + "/.installed") == "bun-1.4.4+test\n");
     for (const char *folder : {"", "/bin", "/install", "/install/global",
                                "/install/global/node_modules", "/install/global/node_modules/a"})
         assert(mode_of(target + folder) == 0755);
@@ -92,10 +92,10 @@ int main()
     assert(read_file(target + "/bin/bun.elf") == "sentinel");
 
     // A new version reinstalls.
-    write_file(app + "/version", "bun-1.4.4+omp-19.0.1+next\n");
+    write_file(app + "/version", "bun-1.4.4+next\n");
     assert(install(app, target));
     assert(read_file(target + "/bin/bun.elf") == elf);
-    assert(read_file(target + "/.installed") == "bun-1.4.4+omp-19.0.1+next\n");
+    assert(read_file(target + "/.installed") == "bun-1.4.4+next\n");
 
     // An interrupted copy has no marker yet, so it is redone.
     write_file(target + "/bin/bun.elf", "sentinel", 0644);

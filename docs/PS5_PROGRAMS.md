@@ -35,7 +35,7 @@ The PS5 has no pseudo-terminal (TTY) for programs, so PS5Term acts as the termin
 
 `run` works in PS5Term's own tabs, not in `ps5term@` SSH sessions.
 
-## Bun and oh-my-pi (`bun`, `omp`)
+## Bun (`bun`)
 
 psbun is the native PS5 port of [Bun](https://bun.sh) in this fork. The full status is
 [BUN_PORT.md](BUN_PORT.md). On a console, through the development launcher, Bun 1.4.4 has
@@ -45,25 +45,17 @@ a TLSv1.3 handshake, and installed a package with `bun install` (including `--fo
 commands are not created (`/data` has no symlinks), and `bun install -g` still fails on those
 links.
 
-The shell has two built-in commands that are meant to run like `run`, with the same needs
-(an ELF loader on port 9021) and rules (own tabs only, no pipes or redirection). A tab has
-not been the console gate:
+The shell's `bun` command runs like `run`, with the same needs (an ELF loader on port 9021)
+and rules (own tabs only, no pipes or redirection):
 
 ```text
 /data$ bun --version
 /data$ bun -e "console.log(require('os').platform())"
-/data$ omp --version
-/data$ omp
 ```
 
-- `bun ARGS` is meant to run `/data/ps5term/bun/bin/bun.elf ARGS`.
-- `omp ARGS` is the later plan: the same Bun, on
-  `/data/ps5term/bun/install/global/node_modules/@oh-my-pi/pi-coding-agent/dist/cli.js ARGS`.
-  oh-my-pi (`@oh-my-pi/pi-coding-agent`, not OpenMP) is the coding-agent harness. Its addon,
-  global install tree and `omp` command are not in the current console cut.
-
-Programs started through the loader cannot see the app folder (`/app0`), so the intended first
-`bun` or `omp` copies `/app0/assets/bun` to `/data/ps5term/bun` (a few hundred MiB; the tab
+`bun ARGS` runs `/data/ps5term/bun/bin/bun.elf ARGS`. Programs started through the loader
+cannot see the app folder (`/app0`), so the first `bun` copies `/app0/assets/bun` to
+`/data/ps5term/bun` (a few hundred MiB; the tab
 waits while it copies). `/data/ps5term/bun/.installed` records the copied version; a PS5Term
 update with a different Bun copies it again, and so does a copy that was interrupted. If the
 copy fails, the command prints `bun: could not install Bun to /data/ps5term/bun: <reason>` and
@@ -73,9 +65,8 @@ landed in `/data/ps5term/bun` was a cache, and it was deleted; later launcher ru
 
 For every program it starts, the launcher sets `PS5TERM_TTY=1` (the PS5 Bun treats the tab's
 socket as its terminal), `BUN_INSTALL=/data/ps5term/bun`, `PATH=/data/ps5term/bun/bin` and
-`BUN_JSC_useJIT=0`; `HOME` stays `/data`, so omp would keep its settings in `/data/.omp`. omp's
-features that need a real pseudo-terminal are unavailable, because the PS5 kernel has no PTY
-driver (see below).
+`BUN_JSC_useJIT=0`; `HOME` stays `/data`. Anything that needs a real pseudo-terminal is
+unavailable, because the PS5 kernel has no PTY driver (see below).
 
 ## For developers: ncurses and termios
 
