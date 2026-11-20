@@ -1,0 +1,11 @@
+--- a/std/src/sys/fs/unix.rs
++++ b/std/src/sys/fs/unix.rs
+@@ -918,7 +918,7 @@
+                         target_os = "netbsd",
+                         target_os = "openbsd",
+                     ))]
+-                    d_ino: (*entry_ptr).d_fileno,
++                    d_ino: (*entry_ptr).d_fileno as u64, // u32 in the FreeBSD 11 ABI (PS5)
+                     #[cfg(any(target_os = "nuttx", target_os = "vita",))]
+                     d_ino: 0,
+                     #[cfg(not(any(

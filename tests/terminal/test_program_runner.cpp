@@ -4,6 +4,8 @@
 #include "fake_run_loader.hpp"
 #include <chrono>
 #include <cstdlib>
+#include <filesystem>
+#include <utility>
 
 namespace
 {
@@ -44,6 +46,24 @@ struct Tab
         return false;
     }
 };
+void write_file(const std::string &path, std::string_view bytes)
+{
+    FILE *file = std::fopen(path.c_str(), "wb");
+    assert(file);
+    std::fwrite(bytes.data(), 1, bytes.size(), file);
+    std::fclose(file);
+}
+std::string shell_errors(term::BuiltinShell &shell)
+{
+    std::string errors;
+    char out[256];
+    for (int i = 0; i < 50; ++i)
+    {
+        shell.tick();
+        errors.append(out, shell.read_error(out, sizeof out));
+    }
+    return errors;
+}
 } // namespace
 
 int main()
@@ -109,6 +129,59 @@ int main()
         assert(tab.wait_for("back"));
         loader.thread.join();
     }
+    // `bun` and `omp`: Bun is copied out of the app first, then runs as `run` would, with
+    // the copy's bun.elf (and for omp its cli.js) ahead of the typed arguments.
+    const std::string bun_app = std::string(directory) + "/app-bun",
+                      bun_target = std::string(directory) + "/data/ps5term/bun",
+                      bun_elf = bun_target + "/bin/bun.elf",
+                      cli = bun_target +
+                            "/install/global/node_modules/@oh-my-pi/pi-coding-agent/dist/cli.js";
+    assert(mkdir(bun_app.c_str(), 0755) == 0 && mkdir((bun_app + "/bin").c_str(), 0755) == 0);
+    write_file(bun_app + "/version", "bun-test-1\n");
+    write_file(bun_app + "/bin/bun.elf", "\177ELF fake bun");
+    for (const auto &[command, expected] :
+         {std::pair<std::string, std::string>{"omp --version", bun_elf + "|" + cli + "|--version|"},
+          {"bun -e x", bun_elf + "|-e|x|"}})
+    {
+        FakeLoader loader;
+        loader.request_path = request;
+        loader.start(false);
+        Tab tab;
+        term::platform::ProgramRunner::Config config;
+        config.request_path = request.c_str();
+        config.launcher_path = launcher.c_str();
+        config.terminfo_directory = terminfo.c_str();
+        config.loader_port = loader.port;
+        config.connect_timeout_ms = 5000;
+        tab.connection.configure_programs(config);
+        tab.connection.configure_bun(bun_app.c_str(), bun_target.c_str());
+        tab.tick(5);
+        assert(tab.connection.submit("cd /tmp"));
+        tab.tick(5);
+        assert(tab.connection.submit(command.c_str()));
+        assert(tab.wait_for("name?"));
+        assert(loader.received_arguments == expected);
+        assert(access(bun_elf.c_str(), R_OK) == 0);
+        assert(tab.connection.submit("Ada"));
+        assert(tab.wait_for("FULL SCREEN"));
+        tab.tick(3);
+        assert(tab.connection.write_raw("a\rb", 3));
+        assert(tab.wait_for("[bun.elf exited with status 5]"));
+        loader.thread.join();
+    }
+    // Nothing to copy: the shell says why, with status 1, and starts nothing. (Not
+    // interactive, so the message stays on the error stream.)
+    {
+        term::BuiltinShell shell("/tmp", false);
+        shell.enable_programs(true);
+        const std::string missing = std::string(directory) + "/no-app-bun";
+        shell.configure_bun(missing.c_str(), bun_target.c_str());
+        assert(shell.submit("omp"));
+        const auto errors = shell_errors(shell);
+        assert(errors ==
+               "bun: could not install Bun to " + bun_target + ": No such file or directory\n");
+        assert(shell.exit_status() == 1 && !shell.program_requested());
+    }
 
     // No loader on the port: a clear message, and the shell carries on.
     {
@@ -167,14 +240,14 @@ int main()
         assert(!tab.connection.running_program());
     }
     // A shell without a tab (SSH) refuses.
+    for (const char *command : {"run ", "bun ", "omp "})
     {
         term::BuiltinShell shell("/tmp", false);
-        assert(shell.submit(("run " + launcher).c_str()));
-        char out[256]{};
-        for (int i = 0; i < 50 && !shell.read_error(out, sizeof out - 1); ++i)
-            shell.tick();
-        assert(std::strstr(out, "not over SSH"));
+        assert(shell.submit((command + launcher).c_str()));
+        assert(shell_errors(shell).find("not over SSH") != std::string::npos);
     }
+    std::filesystem::remove_all(bun_app);
+    std::filesystem::remove_all(std::string(directory) + "/data");
     unlink(launcher.c_str());
     unlink((terminfo + "/x/xterm-256color").c_str());
     rmdir((terminfo + "/x").c_str());
@@ -182,5 +255,6 @@ int main()
     rmdir((std::string(directory) + "/run").c_str());
     rmdir(directory);
     std::puts("PASS: run: request, loader, launcher token, line and raw input, Ctrl+C as SIGINT, "
-              "exit status, missing loader and program, SSH refusal");
+              "exit status, missing loader and program, SSH refusal; bun and omp: install, "
+              "arguments, install failure");
 }

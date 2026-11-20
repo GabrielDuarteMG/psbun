@@ -154,6 +154,12 @@ int main(void)
     setenv("PWD", request.cwd, 1);
     if (!getenv("HOME"))
         setenv("HOME", "/data", 1);
+    /* The socket stands in for a TTY (see docs/PS5_PROGRAMS.md); Bun lives in /data and its
+       JavaScriptCore has no JIT on the PS5. */
+    setenv("PS5TERM_TTY", "1", 1);
+    setenv("BUN_INSTALL", "/data/ps5term/bun", 1);
+    setenv("PATH", "/data/ps5term/bun/bin", 1);
+    setenv("BUN_JSC_useJIT", "0", 1);
     if (chdir(request.cwd))
         chdir("/");
 

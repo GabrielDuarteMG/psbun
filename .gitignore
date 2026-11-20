@@ -23,3 +23,5 @@ dist/
 *.sprx
 *.prx
 *.pkg
+# Staged by tools/build-bun-port.sh from build/bun-port; hundreds of MiB.
+assets/bun/

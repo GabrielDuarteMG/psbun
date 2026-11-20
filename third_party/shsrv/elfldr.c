@@ -647,19 +647,32 @@ elfldr_rfork_entry(void* ctx) {
 pid_t
 elfldr_spawn(int stdin_fd, int stdout_fd, int stderr_fd,
 	     uint8_t* elf, char** argv) {
-  uint8_t int3instr = 0xcc;
   char buf[PATH_MAX];
+  char* cwd;
+
+  if(!(cwd=getenv("PWD"))) {
+    cwd = getcwd(buf, sizeof(buf));
+  }
+
+  return elfldr_spawn_env(stdin_fd, stdout_fd, stderr_fd, elf, argv,
+			  environ, cwd);
+}
+
+
+/**
+ * Execute an ELF inside a new process with an explicit environment and
+ * working directory (PS5Term: used by the Bun port's posix_spawn).
+ **/
+pid_t
+elfldr_spawn_env(int stdin_fd, int stdout_fd, int stderr_fd,
+		 uint8_t* elf, char** argv, char** envp, const char* cwd) {
+  uint8_t int3instr = 0xcc;
   struct kevent evt;
   intptr_t brkpoint;
   uint8_t orginstr;
   pid_t pid = -1;
   void *stack;
-  char* cwd;
   int kq;
-
-  if(!(cwd=getenv("PWD"))) {
-    cwd = getcwd(buf, sizeof(buf));
-  }
 
   if((kq=kqueue()) < 0) {
     perror("kqueue");
@@ -758,7 +771,7 @@ elfldr_spawn(int stdin_fd, int stdout_fd, int stderr_fd,
 
   // Execute the ELF
   elfldr_set_procname(pid, argv[0]);
-  elfldr_set_environ(pid, environ);
+  elfldr_set_environ(pid, envp);
   elfldr_set_cwd(pid, cwd);
 
   if(elfldr_exec(stdin_fd, stdout_fd, stderr_fd, pid, elf)) {

@@ -1,14 +1,19 @@
-# PS5Term
+# psbun
 
 <p align="center">
   <img src="assets/branding/icon.png" alt="PS5Term" width="160" />
 </p>
 
 <p align="center">
-  PS5Term is a terminal for a jailbroken PS5, right on the console's screen: a native
-  shell for the PS5's own files, a real Linux shell with <code>curl</code>, <code>nano</code>,
-  <code>tmux</code> and <code>htop</code>, and SSH and SFTP from your computer. Drive it with a
-  keyboard, a mouse or a controller alone.
+  <strong>psbun</strong> (Bun station 5 port) is this fork of
+  <a href="https://github.com/phantomptr/ps5term">PS5Term</a>. It runs
+  <a href="https://bun.sh">Bun</a> as a native payload on a jailbroken PS5.
+  What has run on a console, and what has not, is in
+  <a href="docs/BUN_PORT.md">docs/BUN_PORT.md</a>.
+  The terminal itself is still PS5Term: a native shell for the PS5's own files, a real
+  Linux shell with <code>curl</code>, <code>nano</code>, <code>tmux</code> and
+  <code>htop</code>, and SSH and SFTP from your computer. Drive it with a keyboard, a
+  mouse or a controller alone.
 </p>
 
 <p align="center">

@@ -115,6 +115,10 @@ class Connection
     {
         program_.configure(config);
     }
+    void configure_bun(const char *app_root, const char *target) noexcept // tests
+    {
+        builtin_.configure_bun(app_root, target);
+    }
     bool resize(unsigned cols, unsigned rows) noexcept;
     platform::GuestAgent &guest_agent() noexcept
     {

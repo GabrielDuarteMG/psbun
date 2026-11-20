@@ -3,7 +3,9 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <initializer_list>
 #include <string_view>
+#include "platform/bun_install.hpp"
 #include "platform/directory.hpp"
 #include "platform/disk_usage.hpp"
 #include "platform/filename_expansion.hpp"
@@ -35,6 +37,13 @@ class BuiltinShell
     void enable_programs(bool enabled) noexcept
     {
         programs_enabled_ = enabled;
+    }
+    // `bun` and `omp` copy Bun from app_root to target before running it from there.
+    // Tests use their own folders; both strings must outlive the shell.
+    void configure_bun(const char *app_root, const char *target) noexcept
+    {
+        bun_app_root_ = app_root;
+        bun_target_ = target;
     }
     // A run waiting for its tab: NUL-separated arguments (the first an absolute path).
     bool program_requested() const noexcept
@@ -139,6 +148,7 @@ class BuiltinShell
     bool programs_enabled_ = false, program_taken_ = false;
     std::array<char, 6144> program_args_{};
     std::size_t program_args_size_ = 0;
+    const char *bun_app_root_ = platform::bun_app_root, *bun_target_ = platform::bun_target;
     // Variable expansion
     std::array<char, 513> item_{};
     std::array<char, 1024> expanded_{};
@@ -160,6 +170,10 @@ class BuiltinShell
     void next_item() noexcept;
     bool open_output(const char *name, bool append_mode, int &fd) noexcept;
     bool prepare_pipeline() noexcept;
+    // `run`, `bun` and `omp`: the tab runs the program (see program_requested()).
+    bool program_tab_free(const char *name) noexcept;
+    void request_program(const char *name, std::initializer_list<const char *> lead, int argc,
+                         char **argv, int first) noexcept;
     // Pipeline helpers
     char *pipe_in_ptr() noexcept
     {

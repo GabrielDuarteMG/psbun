@@ -64,7 +64,7 @@ def build():
     archive.unlink(missing_ok=True)
     subprocess.run(['ar', 'rcs', str(archive), *map(str, objects)], check=True)
     common = ['backend/owned_ssh/connection.cpp', 'src/ssh/command_session.cpp',
-              'src/builtin_shell.cpp', 'src/platform/system_info.cpp', 'src/platform/filename_expansion.cpp', 'src/platform/disk_usage.cpp', 'src/platform/directory.cpp']
+              'src/builtin_shell.cpp', 'src/platform/bun_install.cpp', 'src/platform/system_info.cpp', 'src/platform/filename_expansion.cpp', 'src/platform/disk_usage.cpp', 'src/platform/directory.cpp']
     identity = ['backend/owned_ssh/identity.cpp']
     service = ['backend/owned_ssh/service.cpp', *identity, *common]
     targets = {

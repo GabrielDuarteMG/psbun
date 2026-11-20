@@ -683,6 +683,54 @@ void BuiltinShell::usage(const char *text) noexcept
     std::snprintf(message, sizeof message, "usage: %s\n", text);
     diagnostic(message, 2);
 }
+bool BuiltinShell::program_tab_free(const char *name) noexcept
+{
+    char message[128];
+    if (!programs_enabled_)
+    {
+        std::snprintf(message, sizeof message,
+                      "%s: PS5 programs run in PS5Term's own tabs, not over SSH\n", name);
+        diagnostic(message, 1);
+        return false;
+    }
+    if (piping_ || pipeline_.count > 1 || redir_fd_ >= 0)
+    {
+        std::snprintf(message, sizeof message,
+                      "%s: a program takes the whole tab; no pipes or redirection\n", name);
+        diagnostic(message, 2);
+        return false;
+    }
+    return true;
+}
+// lead (the program's absolute path first), then argv[first..]: NUL-separated for the tab.
+void BuiltinShell::request_program(const char *name, std::initializer_list<const char *> lead,
+                                   int argc, char **argv, int first) noexcept
+{
+    program_args_size_ = 0;
+    const auto add = [this](std::string_view value)
+    {
+        if (program_args_size_ + value.size() + 1 > program_args_.size())
+            return false;
+        std::memcpy(program_args_.data() + program_args_size_, value.data(), value.size());
+        program_args_size_ += value.size();
+        program_args_[program_args_size_++] = '\0';
+        return true;
+    };
+    bool fits = true;
+    for (const char *value : lead)
+        fits = fits && add(value);
+    for (int i = first; fits && i < argc; ++i)
+        fits = add(argv[i]);
+    if (!fits || lead.size() + static_cast<std::size_t>(argc - first) > 32)
+    {
+        char message[96];
+        std::snprintf(message, sizeof message, "%s: too many or too long arguments\n", name);
+        diagnostic(message, 2);
+        return;
+    }
+    program_taken_ = false;
+    state_ = State::program;
+}
 void BuiltinShell::error(int code) noexcept
 {
     char message[192];
@@ -1311,6 +1359,8 @@ void BuiltinShell::execute_command(int argc, char **argv) noexcept
             "  other:  echo printf sleep env export unset true false clear help\n"
             "  programs: run PATH [ARGS] runs a PS5 ELF program in this tab (needs an ELF\n"
             "          loader on port 9021; Ctrl+C interrupts; no TTY, so the size is fixed)\n"
+            "          bun [ARGS] runs Bun (first use copies it to /data/ps5term/bun)\n"
+            "          omp [ARGS] runs the oh-my-pi coding agent on that Bun\n"
             "Combine: cmd1 | cmd2, cmd1 ; cmd2, cmd1 && cmd2, cmd1 || cmd2\n"
             "Redirect: > file, >> file, < file, 2> file, 2>&1\n"
             "Wildcards: final filename * and ?; quote literal patterns; Linux has full globbing\n"
@@ -1410,19 +1460,11 @@ void BuiltinShell::execute_command(int argc, char **argv) noexcept
     }
     if (cmd == "run")
     {
-        if (!programs_enabled_)
-        {
-            diagnostic("run: PS5 programs run in PS5Term's own tabs, not over SSH\n", 1);
+        if (!program_tab_free("run"))
             return;
-        }
         if (argc < 2)
         {
             usage("run PATH [ARGUMENTS]  (a PS5 ELF program, in this tab)");
-            return;
-        }
-        if (piping_ || pipeline_.count > 1 || redir_fd_ >= 0)
-        {
-            diagnostic("run: a program takes the whole tab; no pipes or redirection\n", 2);
             return;
         }
         std::array<char, 1024> program{};
@@ -1440,26 +1482,39 @@ void BuiltinShell::execute_command(int argc, char **argv) noexcept
             diagnostic("run: not a program file\n", 126);
             return;
         }
-        program_args_size_ = 0;
-        const auto add = [this](std::string_view value)
+        request_program("run", {program.data()}, argc, argv, 2);
+        return;
+    }
+    if (cmd == "bun" || cmd == "omp")
+    {
+        const char *name = cmd == "bun" ? "bun" : "omp";
+        if (!program_tab_free(name))
+            return;
+        // Payloads cannot see /app0, so Bun runs from its copy in /data.
+        int failure = 0;
+        std::array<char, 1024> program{}, script{};
+        const int program_size =
+            std::snprintf(program.data(), program.size(), "%s/bin/bun.elf", bun_target_);
+        const int script_size = std::snprintf(
+            script.data(), script.size(),
+            "%s/install/global/node_modules/@oh-my-pi/pi-coding-agent/dist/cli.js", bun_target_);
+        if (program_size < 0 || script_size < 0 ||
+            static_cast<std::size_t>(script_size) >= script.size())
+            failure = ENAMETOOLONG;
+        else
+            platform::ensure_bun_installed(bun_app_root_, bun_target_, &failure);
+        if (failure)
         {
-            if (program_args_size_ + value.size() + 1 > program_args_.size())
-                return false;
-            std::memcpy(program_args_.data() + program_args_size_, value.data(), value.size());
-            program_args_size_ += value.size();
-            program_args_[program_args_size_++] = '\0';
-            return true;
-        };
-        bool fits = add(program.data());
-        for (int i = 2; fits && i < argc; ++i)
-            fits = add(argv[i]);
-        if (!fits || argc - 1 > 32)
-        {
-            diagnostic("run: too many or too long arguments\n", 2);
+            char message[256];
+            std::snprintf(message, sizeof message, "bun: could not install Bun to %s: %s\n",
+                          bun_target_, std::strerror(failure));
+            diagnostic(message, 1);
             return;
         }
-        program_taken_ = false;
-        state_ = State::program;
+        if (cmd == "bun")
+            request_program(name, {program.data()}, argc, argv, 1);
+        else
+            request_program(name, {program.data(), script.data()}, argc, argv, 1);
         return;
     }
     if (cmd == "sleep")

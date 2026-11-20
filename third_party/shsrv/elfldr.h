@@ -27,6 +27,14 @@ pid_t elfldr_spawn(int stdin_fd, int stdout_fd, int stderr_fd,
 
 
 /**
+ * Spawn a new process with an explicit environment and working directory.
+ **/
+pid_t elfldr_spawn_env(int stdin_fd, int stdout_fd, int stderr_fd,
+		       uint8_t *elf, char* argv[], char** envp,
+		       const char* cwd);
+
+
+/**
  * Execute an ELF inside the process with the given pid.
  **/
 int elfldr_exec(int stdin_fd, int stdout_fd, int stderr_fd,

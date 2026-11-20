@@ -1,0 +1,25 @@
+{
+  "webkit": {
+    "url": "https://github.com/samm-git/WebKit.git",
+    "commit": "b590f37da67cd02009bec23d112167cc1bf1a1d3"
+  },
+  "icu": {
+    "version": "78.3",
+    "url": "https://github.com/unicode-org/icu/releases/download/release-78.3/icu4c-78.3-sources.tgz",
+    "sha256": "3a2e7a47604ba702f345878308e6fefeca612ee895cf4a5f222e7955fabfe0c0"
+  },
+  "bun": {
+    "version": "1.4.4",
+    "url": "https://codeload.github.com/oven-sh/bun/tar.gz/38afee6c84fcf48c0edb2466aa4b27d287a59c30",
+    "commit": "38afee6c84fcf48c0edb2466aa4b27d287a59c30",
+    "sha256": "64c0d268a6fa9f5e6e5ac40761dacb6b0825b2092f02cd07d772a9018f39e520"
+  },
+  "rust": {
+    "toolchain": "nightly-2026-09-19"
+  },
+  "omp": {
+    "version": "19.0.1",
+    "package": "@oh-my-pi/pi-coding-agent",
+    "commit": "f40f335845f0b136453d12fec8d6057011082766"
+  }
+}

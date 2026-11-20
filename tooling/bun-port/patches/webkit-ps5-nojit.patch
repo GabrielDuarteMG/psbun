@@ -1,0 +1,128 @@
+diff --git a/Source/JavaScriptCore/runtime/Options.cpp b/Source/JavaScriptCore/runtime/Options.cpp
+index fa2d9958..da7e3b6d 100644
+--- a/Source/JavaScriptCore/runtime/Options.cpp
++++ b/Source/JavaScriptCore/runtime/Options.cpp
+@@ -811,7 +811,9 @@ void Options::notifyOptionsChanged()
+         dataLogLn("useGdbJITInfo should be used with OFFLINE_ASM_ALT_ENTRY");
+ #endif
+ 
+-#if !ENABLE(JIT)
++#if !ENABLE(JIT) || defined(PS5TERM_PS5_PAYLOAD)
++    // PS5 payloads run JavaScript in the LLInt interpreter only: no executable memory is ever
++    // allocated for JIT code, whatever BUN_JSC_* / JSC_* options request.
+     Options::useJIT() = false;
+ #endif
+ #if !ENABLE(CONCURRENT_JS)
+diff --git a/Source/JavaScriptCore/runtime/Options.h b/Source/JavaScriptCore/runtime/Options.h
+index 30aa3c81..bba24aef 100644
+--- a/Source/JavaScriptCore/runtime/Options.h
++++ b/Source/JavaScriptCore/runtime/Options.h
+@@ -174,7 +174,11 @@ private:
+     static unsigned computeNumberOfGCMarkers(unsigned maxNumberOfGCMarkers);
+     static unsigned computeNumberOfWorkerThreads(int maxNumberOfWorkerThreads, int minimum = 1);
+     static int32_t computePriorityDeltaOfWorkerThreads(int32_t twoCorePriorityDelta, int32_t multiCorePriorityDelta);
++#if defined(PS5TERM_PS5_PAYLOAD)
++    static constexpr bool jitEnabledByDefault() { return false; } // LLInt only on the PS5.
++#else
+     static constexpr bool jitEnabledByDefault() { return isAddress64Bit(); }
++#endif
+     static constexpr bool ipintEnabledByDefault() { return isARM64() || isARM64E() || isX86_64(); }
+     static double defaultQuickDFGTierUpThresholdFactor()
+     {
+diff --git a/Source/JavaScriptCore/wasm/WasmMachineThreads.cpp b/Source/JavaScriptCore/wasm/WasmMachineThreads.cpp
+index 208b1844..a39a2cd2 100644
+--- a/Source/JavaScriptCore/wasm/WasmMachineThreads.cpp
++++ b/Source/JavaScriptCore/wasm/WasmMachineThreads.cpp
+@@ -31,7 +31,7 @@
+ #include "MachineStackMarker.h"
+ #include <wtf/NeverDestroyed.h>
+ 
+-#if OS(FREEBSD)
++#if OS(FREEBSD) && !CPU(X86_64) // x86_64 needs no barrier; PS5 payload headers have no membarrier.
+ #include <sys/membarrier.h>
+ #endif
+ 
+diff --git a/Source/WTF/wtf/PageBlock.h b/Source/WTF/wtf/PageBlock.h
+index 46a31bf8..e3542c04 100644
+--- a/Source/WTF/wtf/PageBlock.h
++++ b/Source/WTF/wtf/PageBlock.h
+@@ -52,7 +52,8 @@ namespace WTF {
+ // USE(64KB_PAGE_BLOCK) allows overriding this on other architectures too.
+ //
+ // Use 64 KiB for any unknown CPUs to be conservative.
+-#if OS(DARWIN) || PLATFORM(PLAYSTATION) || CPU(MIPS) || CPU(MIPS64) || CPU(LOONGARCH64)
++// PS5 payloads (__PROSPERO__, PS5Term's Bun port) run with 16 KiB pages like the PlayStation port.
++#if OS(DARWIN) || PLATFORM(PLAYSTATION) || defined(__PROSPERO__) || CPU(MIPS) || CPU(MIPS64) || CPU(LOONGARCH64)
+ constexpr size_t CeilingOnPageSize = 16 * KB;
+ #elif USE(64KB_PAGE_BLOCK) || (OS(LINUX) && CPU(ARM64)) || CPU(PPC) || CPU(PPC64) || CPU(PPC64LE) || CPU(UNKNOWN)
+ constexpr size_t CeilingOnPageSize = 64 * KB;
+diff --git a/Source/WTF/wtf/StackBounds.cpp b/Source/WTF/wtf/StackBounds.cpp
+index 8cea1e87..ca1c7f2f 100644
+--- a/Source/WTF/wtf/StackBounds.cpp
++++ b/Source/WTF/wtf/StackBounds.cpp
+@@ -208,9 +208,11 @@ WTF_ALLOW_UNSAFE_BUFFER_USAGE_END
+         }, &gnuStackSize);
+         narrow(gnuStackSize & ~(pageSize - 1));
+         // rlim_cur as exec left it (immune to a later setrlimit raise past the mapping) and as it is now.
++#ifdef AT_USRSTACKLIM // FreeBSD 14+; absent from the FreeBSD 11 ABI of PS5 payloads.
+         unsigned long execStackLimit = 0;
+         if (!elf_aux_info(AT_USRSTACKLIM, &execStackLimit, sizeof(execStackLimit)))
+             narrow(execStackLimit);
++#endif
+         rlimit limit;
+         if (!getrlimit(RLIMIT_STACK, &limit) && limit.rlim_cur != RLIM_INFINITY)
+             narrow(limit.rlim_cur);
+diff --git a/Source/bmalloc/bmalloc/BPlatform.h b/Source/bmalloc/bmalloc/BPlatform.h
+index 99a96d5e..9a5b3dac 100644
+--- a/Source/bmalloc/bmalloc/BPlatform.h
++++ b/Source/bmalloc/bmalloc/BPlatform.h
+@@ -117,7 +117,8 @@
+ #define BPLATFORM_APPLETV 1
+ #endif
+ 
+-#if defined(__SCE__)
++/* PS5 payloads (PS5TERM_PS5_PAYLOAD) use the FreeBSD paths, not the official PlayStation SDK ones. */
++#if defined(__SCE__) && !defined(PS5TERM_PS5_PAYLOAD)
+ #define BPLATFORM_PLAYSTATION 1
+ #endif
+ 
+diff --git a/Source/bmalloc/libpas/src/libpas/pas_config.h b/Source/bmalloc/libpas/src/libpas/pas_config.h
+index 47a88c71..8bc23430 100644
+--- a/Source/bmalloc/libpas/src/libpas/pas_config.h
++++ b/Source/bmalloc/libpas/src/libpas/pas_config.h
+@@ -127,7 +127,7 @@
+ 
+ #define PAS_ADDRESS_BITS                 48
+ 
+-#if PAS_ARM || PAS_PLATFORM(PLAYSTATION)
++#if PAS_ARM || PAS_PLATFORM(PLAYSTATION) || defined(PS5TERM_PS5_PAYLOAD) /* 16 KiB pages */
+ #define PAS_MAX_GRANULES                 256
+ #else
+ #define PAS_MAX_GRANULES                 1024
+diff --git a/Source/bmalloc/libpas/src/libpas/pas_internal_config.h b/Source/bmalloc/libpas/src/libpas/pas_internal_config.h
+index 25e00149..cde5e42e 100644
+--- a/Source/bmalloc/libpas/src/libpas/pas_internal_config.h
++++ b/Source/bmalloc/libpas/src/libpas/pas_internal_config.h
+@@ -71,7 +71,7 @@
+ 
+ #if PAS_ARM64 && PAS_OS(LINUX)
+ #define PAS_GRANULE_DEFAULT_SHIFT        16
+-#elif PAS_ARM64 || PAS_PLATFORM(PLAYSTATION)
++#elif PAS_ARM64 || PAS_PLATFORM(PLAYSTATION) || defined(PS5TERM_PS5_PAYLOAD) /* 16 KiB pages */
+ #define PAS_GRANULE_DEFAULT_SHIFT        14
+ #else
+ #define PAS_GRANULE_DEFAULT_SHIFT        12
+diff --git a/Source/bmalloc/libpas/src/libpas/pas_platform.h b/Source/bmalloc/libpas/src/libpas/pas_platform.h
+index 83fdac2b..cf830869 100644
+--- a/Source/bmalloc/libpas/src/libpas/pas_platform.h
++++ b/Source/bmalloc/libpas/src/libpas/pas_platform.h
+@@ -206,7 +206,8 @@
+ #define PAS_PLATFORM_VISION 1
+ #endif
+ 
+-#if defined(__SCE__)
++/* PS5 payloads (PS5TERM_PS5_PAYLOAD) use the FreeBSD paths, not the official PlayStation SDK ones. */
++#if defined(__SCE__) && !defined(PS5TERM_PS5_PAYLOAD)
+ #define PAS_PLATFORM_PLAYSTATION 1
+ #endif
+ 

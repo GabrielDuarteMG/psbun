@@ -426,6 +426,11 @@ for asset in icon0.png pic0.dds pic1.dds snd0.at9; do
 done
 # `run` sends this payload to the ELF loader; it is built from source, never committed.
 bash "$root/tools/build-run-payload.sh"
+# `bun` and `omp` copy assets/bun to /data on first use. Staged only once the Bun port has been
+# built (tools/build-bun-port.sh); the app builds without it.
+if [[ -f "$root/build/bun-port/bun.elf" ]]; then
+    bash "$root/tools/build-bun-port.sh" --stage "$root/assets/bun"
+fi
 mkdir -p "$app/assets"
 cp "$build/generated/build-info.json" "$app/assets/build-info.json"
 python3 "$root/tools/app_distribution.py" --root "$root" --app "$app"
