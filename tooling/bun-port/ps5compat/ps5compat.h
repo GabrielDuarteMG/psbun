@@ -7,6 +7,7 @@
  * process creation inherited from shsrv's elfldr_spawn (third_party/shsrv/elfldr.c). */
 #pragma once
 
+#include <limits.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <sys/types.h>
@@ -45,6 +46,15 @@ int posix_spawn_file_actions_addclosefrom_np(ps5compat_file_actions_t *actions, 
 /* The bun.elf used for "#!/usr/bin/env bun" scripts and for spawning "bun":
  * $PS5COMPAT_BUN, else /data/ps5term/bun/bin/bun.elf. */
 const char *ps5compat_bun_path(void);
+
+/* Bun bin shims, written where /data refuses symlinks: a 0755 "#!/usr/bin/env bun" file whose
+ * second line is "// bun-ps5-bin-shim <target>" (format and rules in binshim.c). Errors set
+ * errno and return -1, except resolve, which returns the errno (0 on success). */
+ssize_t ps5compat_bin_shim_parse(const void *bytes, size_t size, const char **target);
+int ps5compat_bin_shim_create(const char *path, const char *target);
+ssize_t ps5compat_bin_shim_read(int dirfd, const char *path, char *buf, size_t size);
+int ps5compat_bin_shim_resolve(const char *shim_path, const char *target, size_t target_len,
+                               char out[PATH_MAX]);
 
 /* The native addon linked into bun.elf, exposed through dlopen() of any path ending in
  * PS5COMPAT_ADDON_SUFFIX. */

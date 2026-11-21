@@ -11,7 +11,7 @@ OUT ?= ../../build/bun-port
 CFLAGS := -Wall -Werror -O2 -fPIC -Ips5compat/include -include ps5compat_prelude.h
 CXXFLAGS := -Wall -Werror -O2 -std=c++20
 
-COMPAT_SRC := ps5compat/ps5compat.c ps5compat/spawn.c ps5compat/emutls.c ps5compat/fdpath.c ps5compat/syscall_errno.S \
+COMPAT_SRC := ps5compat/ps5compat.c ps5compat/spawn.c ps5compat/binshim.c ps5compat/emutls.c ps5compat/fdpath.c ps5compat/syscall_errno.S \
               ../run-payload/ps5term_tty.c $(SHSRV)/elfldr.c $(SHSRV)/pt.c
 COMPAT_OBJ := $(patsubst %,$(OUT)/obj/%.o,$(basename $(notdir $(COMPAT_SRC))))
 COMPAT_LDFLAGS := -L$(OUT) -Wl,--whole-archive -lps5compat -Wl,--no-whole-archive \

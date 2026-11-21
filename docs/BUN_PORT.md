@@ -53,7 +53,7 @@ Nothing already published solves this. Bun asks the kernel for a function the PS
 
 **`faccessat` and `readlinkat` always return `ENOSYS`.** `utimensat` returns `EACCES` and `futimens` returns `ESRCH` ("process not found"), which is a sign the call may be landing on a different Sony function. `eaccess` is another bare SDK stub and also returns `ENOSYS`. Payloads run with real uid 1 and effective uid 0. The layer never issues those calls. `faccessat` with `F_OK` uses `fstatat`; other modes use `access` on the directory descriptor's path (real ids) or, for `AT_EACCESS` and `eaccess`, the kernel's permission rule with the effective ids. `readlinkat` uses `readlink`. `utimensat` and `futimens` use `utimes`, `lutimes` and `futimes` (microsecond precision, `UTIME_NOW` and `UTIME_OMIT` honoured). `/data` is nullfs and ignores access times even for the kernel's own `utimes`. This is what let `bun install --force` get past `the downloaded package was not found in the cache`.
 
-**Package executables need a symlink.** `node_modules/.bin` entries are symbolic links, and `/data` cannot store them. In `src/install/bin.rs`, an `EOPNOTSUPP` from `symlink` takes the exit Bun already has for Android shared storage: one warning, the bin links are skipped, the packages themselves are installed. `bun add semver` passed that way.
+**Package executables need a symlink.** `node_modules/.bin` entries are symbolic links, and `/data` cannot store them. In `src/install/bin.rs`, an `EOPNOTSUPP` from `symlink` writes a bin shim in its place. The shim is a 0755 `#!/usr/bin/env bun` file whose second line is `// bun-ps5-bin-shim <target>`, where `<target>` is the text the symlink would have held ([tooling/bun-port/ps5compat/binshim.c](../tooling/bun-port/ps5compat/binshim.c)). ps5compat's `posix_spawn` runs the target in `bun.elf` with argv `[bun.elf, <target realpath>, args…]`. Bun reads a shim back as a link (`readlink_or_shim`), so it applies the usual rules: it replaces its own shims, removes and prunes them, and refuses foreign files in the global bin directory (`EEXIST`). The design follows the Windows `.bunx` approach. Copying the target was rejected upstream (oven-sh/bun#40161), and a `#!/bin/sh` shim cannot run here.
 
 These had to work before install could:
 
@@ -65,9 +65,8 @@ These had to work before install could:
 
 ## What install still does not do
 
-- Commands in `node_modules/.bin` are not created. The package loads through `require`. `bun run semver`, and `bunx` for those commands, do not work. `semver` above is the example.
-- `bun install -g` still fails when it tries to create links in the global bin directory.
-- Small files that invoke the package, in place of those symlinks, would be new Bun behaviour. It is not part of this cut.
+- Payloads cannot write to the global bin directory the app installs, `/data/ps5term/bun/bin`. It belongs to uid 1 with mode 755, and payloads run with effective uid 0, which the PS5 does not treat as root (`EACCES`). `bun add -g` works with a writable `BUN_INSTALL_BIN`/`BUN_INSTALL_GLOBAL_DIR`, which is how it was checked.
+- `process.execPath` is `/data/ps5term/bun/bin/bun.elf` even when another `bun.elf` is running, so `Bun.spawn(process.execPath, …)` starts the installed copy.
 
 ## Other difficulties
 
@@ -108,4 +107,4 @@ The diary marks the addon, the global install tree and the `omp` command as out 
 - The native addon is linked into `bun.elf`. `dlopen` of a path ending in `pi_natives.freebsd-x64-baseline.node` returns that addon. [tooling/bun-port/flatten_tree.py](../tooling/bun-port/flatten_tree.py) drops the other platforms' native packages.
 - Settings would live in `/data/.omp`, because `HOME` is `/data`.
 - Features that need a pseudo-terminal are unavailable. The kernel has no PTY driver.
-- `bun install -g` still fails on the global bin symlinks, so installing oh-my-pi cannot depend on that command until there is another way to publish the CLI.
+- `bun install -g` creates bin shims, but a payload cannot write to `/data/ps5term/bun/bin` (see above). Installing oh-my-pi there has to run with the app's uid, or with a bin directory the payload owns.

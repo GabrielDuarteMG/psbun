@@ -7,6 +7,7 @@
  * them fail with ENOTSUP, close of them is naturally satisfied). Executables:
  *   - an ELF file is loaded as is;
  *   - a script whose "#!" interpreter is bun (directly, or through env) runs in bun.elf;
+ *   - a Bun bin shim (binshim.c) runs its target in bun.elf;
  *   - anything else fails with ENOEXEC.
  * POSIX_SPAWN_SETPGROUP/SETSID cannot be applied to a process the loader already started; the
  * child stays in the caller's session and process group. */
@@ -408,6 +409,7 @@ static int do_spawn(pid_t *out_pid, const char *file, const posix_spawn_file_act
     Image image = {0};
     char *extra = NULL;
     char **child_argv = NULL;
+    char shim_target[PATH_MAX]; /* outlives the branch: child_argv may point at it */
     int opened[16], opened_count = 0;
     int error = map_file(file, &image);
     if (error)
@@ -431,8 +433,15 @@ static int do_spawn(pid_t *out_pid, const char *file, const posix_spawn_file_act
     }
     else
     {
-        int script = bun_script(&image, &extra);
+        const char *target;
+        ssize_t target_len = ps5compat_bin_shim_parse(image.bytes, image.size, &target);
+        int shim = target_len >= 0;
+        if (shim) /* before unmap_file: target points into the mapping */
+            error = ps5compat_bin_shim_resolve(file, target, (size_t)target_len, shim_target);
+        int script = shim ? 1 : bun_script(&image, &extra);
         unmap_file(&image);
+        if (shim && error)
+            goto done;
         if (script <= 0)
         {
             error = script < 0 ? ENOMEM : ENOEXEC;
@@ -456,7 +465,9 @@ static int do_spawn(pid_t *out_pid, const char *file, const posix_spawn_file_act
         child_argv[n++] = (char *)bun;
         if (extra)
             child_argv[n++] = extra;
-        child_argv[n++] = (char *)file;
+        /* A shim's target always runs in bun, whatever its own shebang says (node included):
+         * a non-JS target cannot run on the PS5 anyway. */
+        child_argv[n++] = (char *)(shim ? shim_target : file);
         for (int i = 1; i < argc; i++)
             child_argv[n++] = argv[i];
     }
